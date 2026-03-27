@@ -13,8 +13,9 @@ export default function PendingApprovalsPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [applications, setApplications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-
-  const staffId = "staff_123" // Placeholder - in prod get from session
+  const storedUser = localStorage.getItem('user')
+  const user = storedUser ? JSON.parse(storedUser) : null
+  const staffId = user?._id || "65f123456789012345678901"
 
   useEffect(() => {
     fetchPending()

@@ -37,7 +37,7 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
-export async function extractTextFromPdf(file: File): Promise<string> {
+async function extractTextFromPdf(file: File): Promise<string> {
   const fileName = uuidv4();
   const tempFilePath = join("/tmp", `${fileName}.pdf`);
 

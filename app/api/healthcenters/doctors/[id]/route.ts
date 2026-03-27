@@ -32,6 +32,15 @@ function parseList(value: unknown) {
     .filter(Boolean)
 }
 
+function normalizeModes(value: unknown) {
+  if (!Array.isArray(value)) return ['in_person']
+  const allowed = new Set(['in_person', 'video', 'voice'])
+  const modes = value
+    .map((item) => String(item).trim())
+    .filter((item) => allowed.has(item))
+  return modes.length > 0 ? modes : ['in_person']
+}
+
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
@@ -47,11 +56,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Doctor not found or access denied' }, { status: 404 })
     }
 
+    const normalizedEmail = String(body.email || '').trim().toLowerCase()
+    if (!normalizedEmail) {
+      return NextResponse.json({ error: 'Doctor email is required' }, { status: 400 })
+    }
+
+    const conflictingUser: any = await User.findOne({ email: normalizedEmail })
+    if (
+      conflictingUser &&
+      String(conflictingUser._id) !== String(context.doctor.userId || '') &&
+      conflictingUser.role !== 'doctor'
+    ) {
+      return NextResponse.json({ error: 'This email is already used by another account role' }, { status: 400 })
+    }
+
     const updatedDoctor = await Doctor.findByIdAndUpdate(
       id,
       {
         name: body.name,
-        email: body.email,
+        email: normalizedEmail,
         phone: body.phone,
         specialization: body.specialization,
         qualifications: parseList(body.qualifications),
@@ -59,9 +82,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         diseasesHandled: parseList(body.diseasesHandled),
         careNeeds: parseList(body.careNeeds),
         languages: parseList(body.languages),
-        availableModes: Array.isArray(body.availableModes) && body.availableModes.length > 0
-          ? body.availableModes
-          : ['in_person'],
+        availableModes: normalizeModes(body.availableModes),
         availability: body.availability || {},
         consultationFee: body.consultationFee ? Number(body.consultationFee) : undefined,
         imageUrl: body.imageUrl || '',
@@ -69,6 +90,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
       { new: true }
     )
+
+    let doctorUser: any = null
+    if (context.doctor.userId) {
+      doctorUser = await User.findById(context.doctor.userId)
+    }
+    if (!doctorUser && conflictingUser?.role === 'doctor') {
+      doctorUser = conflictingUser
+    }
+
+    if (doctorUser) {
+      doctorUser.name = body.name
+      doctorUser.email = normalizedEmail
+      doctorUser.phone = body.phone
+      doctorUser.role = 'doctor'
+      doctorUser.healthCenterId = context.center._id
+      doctorUser.assignedHealthCenter = context.center._id
+      doctorUser.doctorProfileId = updatedDoctor?._id
+      doctorUser.specialization = body.specialization
+      if (body.portalPassword && String(body.portalPassword).length >= 8) {
+        doctorUser.password = body.portalPassword
+      }
+      await doctorUser.save()
+    }
 
     return NextResponse.json({ success: true, doctor: updatedDoctor })
   } catch (error: any) {
@@ -90,6 +134,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const context = await canManageDoctor(userId, id)
     if (!context) {
       return NextResponse.json({ error: 'Doctor not found or access denied' }, { status: 404 })
+    }
+
+    if (context.doctor.userId) {
+      await User.findByIdAndUpdate(context.doctor.userId, {
+        $unset: {
+          doctorProfileId: 1,
+          healthCenterId: 1,
+          assignedHealthCenter: 1,
+          specialization: 1,
+        },
+      })
     }
 
     await Doctor.findByIdAndDelete(id)

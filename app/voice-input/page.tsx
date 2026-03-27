@@ -15,6 +15,8 @@ type AnalysisResult = {
   careSpecialties?: string[]
   diseaseKeywords?: string[]
   originalTranscript?: string
+  location?: { latitude: number; longitude: number } | null
+  nearbyHealthCenters?: any[]
   id?: string
 }
 
@@ -53,6 +55,9 @@ export default function VoiceInputPage() {
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null)
   const [nearbyHospitals, setNearbyHospitals] = useState<any[]>([])
   const [roomInfo, setRoomInfo] = useState<any | null>(null)
+  const [locationMode, setLocationMode] = useState<'current' | 'previous' | 'skip'>('current')
+  const [locationMessage, setLocationMessage] = useState('We will use your current location to suggest nearby health centers after analysis.')
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -60,6 +65,58 @@ export default function VoiceInputPage() {
   const audioUrlRef = useRef<string | null>(null)
 
   const hasAudioInputs = useMemo(() => devices.length > 0, [devices])
+  const selectedHospital = useMemo(
+    () => nearbyHospitals.find((hospital) => String(hospital.id) === String(selectedHospitalId)) || null,
+    [nearbyHospitals, selectedHospitalId]
+  )
+
+  const resolveSelectedLocation = async () => {
+    if (locationMode === 'skip') {
+      setLocationMessage('Nearby health center suggestions will be shown without distance sorting.')
+      return null
+    }
+
+    if (locationMode === 'previous') {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('lastKnownLocation') : null
+      if (!stored) {
+        throw new Error('No previously saved location found. Switch to current location to continue.')
+      }
+
+      const parsed = JSON.parse(stored)
+      if (!Number.isFinite(parsed?.latitude) || !Number.isFinite(parsed?.longitude)) {
+        throw new Error('Saved location is invalid. Switch to current location to continue.')
+      }
+
+      setLocationMessage('Using your previously saved location for nearby health center suggestions.')
+      return {
+        latitude: Number(parsed.latitude),
+        longitude: Number(parsed.longitude),
+      }
+    }
+
+    if (!navigator.geolocation) {
+      throw new Error('Geolocation is not supported in this browser.')
+    }
+
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+      })
+    })
+
+    const nextLocation = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lastKnownLocation', JSON.stringify(nextLocation))
+    }
+
+    setLocationMessage('Using your current location for nearby health center suggestions.')
+    return nextLocation
+  }
 
   const stopStream = () => {
     if (streamRef.current) {
@@ -271,6 +328,9 @@ export default function VoiceInputPage() {
     setAnalysis(null)
     setError(null)
     setSaveSuccess(null) // Reset save success status
+    setNearbyHospitals([])
+    setRoomInfo(null)
+    setSelectedHospitalId(null)
 
     try {
       const formData = new FormData()
@@ -295,24 +355,7 @@ export default function VoiceInputPage() {
       const user = storedUser ? JSON.parse(storedUser) : null
       const userId = user?._id || user?.id || null
 
-      let location = null as null | { latitude: number; longitude: number }
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 8000,
-            })
-          })
-
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          }
-        } catch (geoError) {
-          console.warn('Location not available for nearby search:', geoError)
-        }
-      }
+      const location = await resolveSelectedLocation()
 
       const analyzeRes = await fetch('/api/ai/analyze', {
         method: 'POST',
@@ -340,28 +383,14 @@ export default function VoiceInputPage() {
         careSpecialties: Array.isArray(result.careSpecialties) ? result.careSpecialties : [],
         diseaseKeywords: Array.isArray(result.diseaseKeywords) ? result.diseaseKeywords : [],
         originalTranscript: text, // Set the original transcript here
+        location: result.location || location,
+        nearbyHealthCenters: Array.isArray(result.nearbyHealthCenters) ? result.nearbyHealthCenters : [],
         id: result.id,
       })
       setSaveSuccess(true)
-
-      // Fetch nearby hospitals with disease-aware filters
-      try {
-        const params = new URLSearchParams()
-        if (location?.latitude) params.set('lat', String(location.latitude))
-        if (location?.longitude) params.set('lng', String(location.longitude))
-        const diseaseKeywords = Array.isArray(result.diseaseKeywords) ? result.diseaseKeywords : []
-        const specialtyKeywords = Array.isArray(result.careSpecialties) ? result.careSpecialties : []
-        if (diseaseKeywords.length > 0) params.set('disease', diseaseKeywords.join(','))
-        if (specialtyKeywords.length > 0) params.set('needs', specialtyKeywords.join(','))
-
-        const hospitalRes = await fetch(`/api/hospitals/nearby?${params.toString()}`)
-        if (hospitalRes.ok) {
-          const hospitals = await hospitalRes.json()
-          setNearbyHospitals(hospitals)
-        }
-      } catch (hErr) {
-        console.warn('Could not fetch hospitals:', hErr)
-      }
+      const matchedCenters = Array.isArray(result.nearbyHealthCenters) ? result.nearbyHealthCenters : []
+      setNearbyHospitals(matchedCenters)
+      setSelectedHospitalId(matchedCenters[0]?.id ? String(matchedCenters[0].id) : null)
     } catch (err: any) {
       console.error('Processing failed:', err)
       setError(err?.message || 'Failed to transcribe or analyze audio.')
@@ -376,13 +405,29 @@ export default function VoiceInputPage() {
 
     setIsSpeaking(true)
     try {
+      const spokenCenters = nearbyHospitals.slice(0, 3).map((center) => {
+        const doctorCount = Array.isArray(center.doctors) ? center.doctors.length : 0
+        return `${center.name}${center.distance ? ` at ${center.distance}` : ''} with ${doctorCount} matched doctor${doctorCount === 1 ? '' : 's'}`
+      })
+
+      const selectedCenterMessage = selectedHospital
+        ? `You can now review available doctors at ${selectedHospital.name} and request a video or voice call if the doctor is available.`
+        : ''
+
+      const nearbyCentersMessage =
+        spokenCenters.length > 0
+          ? `Nearby suggested health centers are: ${spokenCenters.join('. ')}.`
+          : 'No nearby health centers were matched for these symptoms.'
+
       // Create a readable summary for synthesis
       const summary = `
         Identified symptoms include: ${analysis.symptoms.join(', ')}.
         The risk assessment is ${analysis.riskLevel}.
         Our recommendation is: ${analysis.suggestedAction}.
         Specifically: ${analysis.recommendations[0]}.
-        Important note: ${analysis.emergencyCare}
+        Important note: ${analysis.emergencyCare}.
+        ${nearbyCentersMessage}
+        ${selectedCenterMessage}
       `.substring(0, 500) // Keep it concise for synthesis
 
       const response = await fetch('/api/voice/synthesize', {
@@ -411,7 +456,7 @@ export default function VoiceInputPage() {
     }
   }
 
-  const createConsultationRoom = async (doctorName: string) => {
+  const createConsultationRoom = async (doctor: { id: string; name: string }, callType: 'video' | 'voice') => {
     try {
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
       const user = storedUser ? JSON.parse(storedUser) : null
@@ -420,8 +465,14 @@ export default function VoiceInputPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          doctorName,
+          doctorId: doctor.id,
+          doctorName: doctor.name,
           patientName: user?.name || 'Patient',
+          patientId: user?._id || user?.id || null,
+          callType,
+          symptoms: analysis?.symptoms || [],
+          recommendations: analysis?.recommendations || [],
+          suggestedAction: analysis?.suggestedAction || '',
         }),
       })
 
@@ -526,6 +577,44 @@ export default function VoiceInputPage() {
                 </div>
 
                 <div className="space-y-4">
+                  <div className="bg-muted/30 p-4 rounded-2xl border border-border/50">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 block">Location For Nearby Centers</label>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {[
+                        {
+                          value: 'current',
+                          label: 'Current',
+                          description: 'Use live GPS location now',
+                        },
+                        {
+                          value: 'previous',
+                          label: 'Previous',
+                          description: 'Reuse last saved location',
+                        },
+                        {
+                          value: 'skip',
+                          label: 'Skip',
+                          description: 'Show suggestions without distance',
+                        },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setLocationMode(option.value as 'current' | 'previous' | 'skip')}
+                          className={`rounded-2xl border px-4 py-3 text-left transition-all ${
+                            locationMode === option.value
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border/50 bg-background hover:bg-secondary/10'
+                          }`}
+                        >
+                          <p className="text-sm font-bold">{option.label}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">{locationMessage}</p>
+                  </div>
+
                   {hasAudioInputs && (
                     <div className="bg-muted/30 p-4 rounded-2xl border border-border/50">
                       <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 block">Microphone</label>
@@ -740,54 +829,124 @@ export default function VoiceInputPage() {
                         </div>
                         <h3 className="text-xl font-bold text-primary mb-6 flex items-center gap-2">
                           <MapPin className="w-6 h-6" />
-                          Recommended Nearby Hospitals
+                          Recommended Nearby Health Centers
                         </h3>
-                        <div className="space-y-4">
-                          {nearbyHospitals.map((hospital, idx) => (
-                            <div key={idx} className="bg-white/50 backdrop-blur-sm p-5 rounded-2xl border border-primary/10 hover:border-primary/30 transition-all space-y-4 group/item hover:translate-x-1">
-                              <div className="flex justify-between items-start gap-4">
-                                <div>
-                                <h4 className="font-bold text-foreground">{hospital.name}</h4>
-                                <p className="text-sm text-muted-foreground">{hospital.address}</p>
-                                <div className="flex items-center gap-4 mt-2">
-                                  <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">{hospital.distance}</span>
-                                  <span className="text-xs text-muted-foreground font-medium">{hospital.phone}</span>
-                                </div>
-                                </div>
-                                <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary hover:text-white transition-colors">
-                                  <ArrowRight className="w-5 h-5" />
-                                </Button>
-                              </div>
-
-                              {hospital.doctors?.length > 0 && (
-                                <div className="space-y-3 rounded-2xl bg-background/70 p-4">
-                                  <p className="text-xs font-black uppercase tracking-[0.22em] text-primary/60">
-                                    Available Doctors For Suggested Needs
-                                  </p>
-                                  {hospital.doctors.slice(0, 3).map((doctor: any) => (
-                                    <div key={doctor.id} className="flex flex-col gap-3 rounded-xl border border-border/60 p-4 md:flex-row md:items-center md:justify-between">
-                                      <div>
-                                        <p className="font-semibold">{doctor.name}</p>
-                                        <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                          {(doctor.diseasesHandled || []).join(', ') || (doctor.careNeeds || []).join(', ')}
-                                        </p>
+                        <div className="grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">
+                          <div className="space-y-3">
+                            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary/60">
+                              Step 1: Choose A Suggested Center
+                            </p>
+                            {nearbyHospitals.map((hospital, idx) => {
+                              const isSelected = String(selectedHospitalId) === String(hospital.id)
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setSelectedHospitalId(String(hospital.id))}
+                                  className={`w-full rounded-2xl border p-5 text-left transition-all ${
+                                    isSelected
+                                      ? 'border-primary bg-white/80 shadow-lg'
+                                      : 'border-primary/10 bg-white/50 hover:border-primary/30 hover:translate-x-1'
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-start gap-4">
+                                    <div>
+                                      <h4 className="font-bold text-foreground">{hospital.name}</h4>
+                                      <p className="text-sm text-muted-foreground">{hospital.address}</p>
+                                      <div className="flex items-center gap-4 mt-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">{hospital.distance}</span>
+                                        <span className="text-xs text-muted-foreground font-medium">{hospital.phone}</span>
                                       </div>
-                                      <Button onClick={() => createConsultationRoom(doctor.name)} className="gap-2">
-                                        Talk to Doctor
-                                      </Button>
                                     </div>
-                                  ))}
+                                    <div className={`rounded-full p-2 ${isSelected ? 'bg-primary text-white' : 'bg-primary/10 text-primary'}`}>
+                                      <ArrowRight className="w-5 h-5" />
+                                    </div>
+                                  </div>
+                                  <p className="mt-3 text-xs text-muted-foreground">
+                                    {hospital.doctors?.length || 0} symptom-matched doctor{hospital.doctors?.length === 1 ? '' : 's'} available
+                                  </p>
+                                </button>
+                              )
+                            })}
+                          </div>
+
+                          <div className="rounded-2xl bg-background/70 p-5">
+                            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary/60">
+                              Step 2: View Available Doctors
+                            </p>
+                            {selectedHospital ? (
+                              <div className="mt-4 space-y-4">
+                                <div>
+                                  <h4 className="text-lg font-bold">{selectedHospital.name}</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Doctors below are matched against the symptoms and specialties from your analysis.
+                                  </p>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+
+                                {selectedHospital.doctors?.length > 0 ? (
+                                  selectedHospital.doctors.map((doctor: any) => {
+                                    const supportsVideo = (doctor.availableModes || []).includes('video')
+                                    const supportsVoice = (doctor.availableModes || []).includes('voice')
+
+                                    return (
+                                      <div key={doctor.id} className="flex flex-col gap-3 rounded-xl border border-border/60 p-4">
+                                        <div>
+                                          <p className="font-semibold">{doctor.name}</p>
+                                          <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
+                                          <p className="mt-1 text-xs text-muted-foreground">
+                                            {(doctor.diseasesHandled || []).join(', ') || (doctor.careNeeds || []).join(', ')}
+                                          </p>
+                                          <p className="mt-2 text-[10px] uppercase tracking-[0.2em] text-primary/60">
+                                            Available: {(doctor.availableModes || []).join(' • ') || 'in_person'}
+                                          </p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button
+                                            onClick={() => createConsultationRoom(doctor, 'video')}
+                                            className="gap-2"
+                                            disabled={!supportsVideo}
+                                          >
+                                            Request Video Call
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => createConsultationRoom(doctor, 'voice')}
+                                            className="gap-2"
+                                            disabled={!supportsVoice}
+                                          >
+                                            Request Voice Call
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )
+                                  })
+                                ) : (
+                                  <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+                                    No doctors are currently matched for this center based on the analyzed symptoms.
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="mt-4 rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+                                Choose a suggested health center to see its available doctors.
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="mt-6 pt-6 border-t border-primary/10 flex justify-center">
                           <Button variant="link" className="text-primary font-bold gap-2" asChild>
                             <a href="/map">View all hospitals on live map <ArrowRight className="w-4 h-4" /></a>
                           </Button>
                         </div>
+                      </Card>
+                    )}
+
+                    {analysis.location && (
+                      <Card className="p-6 border-border/50 bg-card/50 rounded-3xl shadow-lg">
+                        <h3 className="text-sm font-black uppercase tracking-widest opacity-40 mb-3">Location Used For Matching</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {analysis.location.latitude.toFixed(5)}, {analysis.location.longitude.toFixed(5)}
+                        </p>
                       </Card>
                     )}
 
@@ -805,6 +964,11 @@ export default function VoiceInputPage() {
                           <p><strong>Room ID:</strong> {roomInfo.roomID}</p>
                           <p><strong>Token:</strong> {roomInfo.token || 'Token not configured yet'}</p>
                           <p>{roomInfo.message}</p>
+                          {roomInfo.consultationId && (
+                            <Button variant="outline" asChild>
+                              <a href={`/consultations/${roomInfo.consultationId}`}>Open Consultation Room</a>
+                            </Button>
+                          )}
                         </div>
                       </Card>
                     )}

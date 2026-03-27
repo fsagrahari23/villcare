@@ -68,7 +68,9 @@ export default function DashboardPage() {
                 <h3 className="font-bold text-destructive text-lg">High Risk Alert</h3>
                 <p className="text-sm text-destructive/70">Our AI has detected potential health risks. Please consult with a healthcare provider immediately.</p>
               </div>
-              <Button variant="default" className="ml-auto bg-destructive hover:bg-destructive/90 text-white font-bold">View Analysis</Button>
+              <Button asChild variant="default" className="ml-auto bg-destructive hover:bg-destructive/90 text-white font-bold">
+                <Link href="/analyses">View Analysis</Link>
+              </Button>
             </div>
           </Card>
         )}
@@ -105,6 +107,7 @@ export default function DashboardPage() {
             <div className="grid gap-3">
               {[
                 { icon: <Mic className="w-6 h-6" />, title: 'Voice Checkup', desc: 'Record your symptoms', href: '/voice-input' },
+                { icon: <Heart className="w-6 h-6" />, title: 'Symptom History', desc: 'Review past analyses', href: '/analyses' },
                 { icon: <FileText className="w-6 h-6" />, title: 'Upload Report', desc: 'Add medical documents', href: '/reports' },
                 { icon: <MapPin className="w-6 h-6" />, title: 'Find Healthcare', desc: 'Locate nearby centers', href: '/map' },
                 { icon: <MessageSquare className="w-6 h-6" />, title: 'Medical Chat', desc: 'Ask health questions', href: '/chat' }

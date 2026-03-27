@@ -3,7 +3,6 @@ import { v2 as cloudinary } from "cloudinary";
 import { connectDB } from "@/lib/db";
 import User from "@/lib/models/User";
 import HealthCenter from "@/lib/models/HealthCenter";
-
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -157,10 +156,19 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-
     if (password.length < 8) {
       return NextResponse.json(
         { message: "Password must be at least 8 characters" },
+        { status: 400 },
+      );
+    }
+
+    if (role === "doctor") {
+      return NextResponse.json(
+        {
+          message:
+            "Doctors are provisioned by hospitals or health centers. Please contact your health center administrator.",
+        },
         { status: 400 },
       );
     }
@@ -237,6 +245,8 @@ export async function POST(request: NextRequest) {
           },
         ];
       }
+      const hasValidCoords =
+        Number.isFinite(latitude) && Number.isFinite(longitude);
       createdCenter = await HealthCenter.create({
         name: healthCenterName,
         type: healthCenterType,
@@ -247,9 +257,15 @@ export async function POST(request: NextRequest) {
         city,
         state,
         zipCode,
-        latitude: Number.isFinite(latitude) && latitude !== 0 ? latitude : 0,
-        longitude:
-          Number.isFinite(longitude) && longitude !== 0 ? longitude : 0,
+        latitude: hasValidCoords ? latitude : null,
+        longitude: hasValidCoords ? longitude : null,
+
+        ...(hasValidCoords && {
+          location: {
+            type: "Point",
+            coordinates: [longitude, latitude], // ⚠️ lng, lat
+          },
+        }),
         registrationNumber,
         licenseNumber,
         licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
@@ -270,7 +286,6 @@ export async function POST(request: NextRequest) {
       user.assignedHealthCenter = createdCenter._id;
       await user.save();
     }
-
     return NextResponse.json({
       success: true,
       message:
@@ -283,6 +298,7 @@ export async function POST(request: NextRequest) {
         name: user.name,
         role: user.role,
         healthCenterId: createdCenter?._id || user.healthCenterId || null,
+        doctorProfileId: user.doctorProfileId || null,
       },
       healthCenter: createdCenter
         ? {
@@ -290,6 +306,7 @@ export async function POST(request: NextRequest) {
             status: createdCenter.status,
           }
         : null,
+      doctor: null,
     });
   } catch (error: any) {
     console.error("Registration error:", error);

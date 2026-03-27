@@ -11,7 +11,7 @@ import { Heart, Mail, Lock, AlertCircle } from 'lucide-react'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'patient' | 'staff' | 'healthcenter'>('patient')
+  const [role, setRole] = useState<'patient' | 'staff' | 'healthcenter' | 'doctor'>('patient')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -37,6 +37,8 @@ export default function LoginPage() {
           window.location.href = '/staff/dashboard'
         } else if (data.user.role === 'healthcenter') {
           window.location.href = '/healthcenter/dashboard'
+        } else if (data.user.role === 'doctor') {
+          window.location.href = '/doctor/dashboard'
         } else {
           window.location.href = '/dashboard'
         }
@@ -81,12 +83,13 @@ export default function LoginPage() {
                 {[
                   { value: 'patient', label: 'Patient' },
                   { value: 'staff', label: 'Staff/Admin' },
-                  { value: 'healthcenter', label: 'Health Center' }
+                  { value: 'healthcenter', label: 'Health Center' },
+                  { value: 'doctor', label: 'Doctor' }
                 ].map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setRole(opt.value as 'patient' | 'staff' | 'healthcenter')}
+                    onClick={() => setRole(opt.value as 'patient' | 'staff' | 'healthcenter' | 'doctor')}
                     className={`p-2 rounded-lg border transition-colors ${
                       role === opt.value
                         ? 'bg-primary text-primary-foreground border-primary'

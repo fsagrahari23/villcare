@@ -46,6 +46,17 @@ const healthCenterSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number],
+        default: undefined,
+      },
+    },
 
     // Registration details
     registrationNumber: String,
@@ -136,8 +147,17 @@ const healthCenterSchema = new mongoose.Schema(
 );
 
 // Index for geospatial queries
-healthCenterSchema.index({ latitude: 1, longitude: 1 });
+healthCenterSchema.index({ location: "2dsphere" });
 healthCenterSchema.index({ ownerUserId: 1 });
+
+healthCenterSchema.pre("save", function (this: any) {
+  if (Number.isFinite(this.latitude) && Number.isFinite(this.longitude)) {
+    this.location = {
+      type: "Point",
+      coordinates: [this.longitude, this.latitude], // lng, lat
+    };
+  }
+});
 
 export default mongoose.models.HealthCenter ||
   mongoose.model("HealthCenter", healthCenterSchema);

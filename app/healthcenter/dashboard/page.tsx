@@ -14,6 +14,7 @@ type DoctorForm = {
   specialization: string
   email: string
   phone: string
+  portalPassword: string
   qualifications: string
   experienceYears: string
   diseasesHandled: string
@@ -28,6 +29,7 @@ const initialDoctorForm: DoctorForm = {
   specialization: '',
   email: '',
   phone: '',
+  portalPassword: '',
   qualifications: '',
   experienceYears: '',
   diseasesHandled: '',
@@ -45,6 +47,7 @@ export default function HealthCenterDashboardPage() {
   const [editingDoctorId, setEditingDoctorId] = useState('')
   const [savingDoctor, setSavingDoctor] = useState(false)
   const [meetingInfo, setMeetingInfo] = useState<any>(null)
+  const [doctorAccessMessage, setDoctorAccessMessage] = useState('')
 
   const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
   const user = storedUser ? JSON.parse(storedUser) : null
@@ -80,6 +83,7 @@ export default function HealthCenterDashboardPage() {
 
     setSavingDoctor(true)
     setError('')
+    setDoctorAccessMessage('')
 
     try {
       const method = editingDoctorId ? 'PUT' : 'POST'
@@ -100,6 +104,10 @@ export default function HealthCenterDashboardPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save doctor')
 
+      if (!editingDoctorId && data?.doctorUser?.email) {
+        setDoctorAccessMessage(`Doctor login created for ${data.doctorUser.email}. Share the password you entered with the doctor securely.`)
+      }
+
       resetDoctorForm()
       await fetchProfile()
     } catch (err: any) {
@@ -116,6 +124,7 @@ export default function HealthCenterDashboardPage() {
       specialization: doctor.specialization || '',
       email: doctor.email || '',
       phone: doctor.phone || '',
+      portalPassword: '',
       qualifications: (doctor.qualifications || []).join(', '),
       experienceYears: String(doctor.experienceYears || ''),
       diseasesHandled: (doctor.diseasesHandled || []).join(', '),
@@ -189,6 +198,12 @@ export default function HealthCenterDashboardPage() {
         {error && (
           <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             {error}
+          </Card>
+        )}
+
+        {doctorAccessMessage && (
+          <Card className="border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+            {doctorAccessMessage}
           </Card>
         )}
 
@@ -291,12 +306,21 @@ export default function HealthCenterDashboardPage() {
                 </div>
 
                 <div className="mt-5 grid gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Doctors are created by your health center here. This creates their platform login, links them to your center, and enables records plus video or voice consultations.
+                  </p>
                   <Input placeholder="Doctor name" value={doctorForm.name} onChange={(e) => setDoctorForm((current) => ({ ...current, name: e.target.value }))} />
                   <Input placeholder="Specialization" value={doctorForm.specialization} onChange={(e) => setDoctorForm((current) => ({ ...current, specialization: e.target.value }))} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <Input placeholder="Email" value={doctorForm.email} onChange={(e) => setDoctorForm((current) => ({ ...current, email: e.target.value }))} />
                     <Input placeholder="Phone" value={doctorForm.phone} onChange={(e) => setDoctorForm((current) => ({ ...current, phone: e.target.value }))} />
                   </div>
+                  <Input
+                    type="password"
+                    placeholder={editingDoctorId ? 'Set a new login password only if needed' : 'Doctor login password'}
+                    value={doctorForm.portalPassword}
+                    onChange={(e) => setDoctorForm((current) => ({ ...current, portalPassword: e.target.value }))}
+                  />
                   <div className="grid gap-4 md:grid-cols-2">
                     <Input placeholder="Experience years" value={doctorForm.experienceYears} onChange={(e) => setDoctorForm((current) => ({ ...current, experienceYears: e.target.value }))} />
                     <Input placeholder="Consultation fee" value={doctorForm.consultationFee} onChange={(e) => setDoctorForm((current) => ({ ...current, consultationFee: e.target.value }))} />
@@ -326,6 +350,7 @@ export default function HealthCenterDashboardPage() {
                         <div>
                           <h3 className="text-lg font-semibold">{doctor.name}</h3>
                           <p className="text-sm text-primary">{doctor.specialization}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{doctor.email || 'No doctor login email saved'}</p>
                           <p className="mt-2 text-sm text-muted-foreground">
                             {(doctor.diseasesHandled || []).join(', ') || 'No disease tags added'}
                           </p>

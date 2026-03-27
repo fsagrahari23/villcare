@@ -26,6 +26,8 @@ export default function ProfilePage() {
     chronicDiseases: [],
     staffId: '',
     departmentName: '',
+    specialization: '',
+    licenseNumber: '',
     bio: ''
   })
 
@@ -166,7 +168,7 @@ export default function ProfilePage() {
             </Card>
 
             {/* Professional Info (Staff Only) */}
-            {(profile.role === 'staff' || profile.role === 'admin') && (
+            {(profile.role === 'staff' || profile.role === 'admin' || profile.role === 'doctor') && (
               <Card className="p-6 mb-6">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <Briefcase className="w-5 h-5 text-primary" />
@@ -175,7 +177,9 @@ export default function ProfilePage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   {[
                     { label: 'Staff ID', key: 'staffId' },
-                    { label: 'Department', key: 'departmentName' }
+                    { label: 'Department', key: 'departmentName' },
+                    { label: 'Specialization', key: 'specialization' },
+                    { label: 'License Number', key: 'licenseNumber' }
                   ].map((field) => (
                     <div key={field.key}>
                       <label className="text-xs font-semibold text-muted-foreground mb-1">{field.label}</label>

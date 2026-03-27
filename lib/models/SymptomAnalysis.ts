@@ -29,6 +29,8 @@ const symptomAnalysisSchema = new mongoose.Schema(
             recommendations: [String],
             suggestedAction: String,
             emergencyCare: String,
+            careSpecialties: [String],
+            diseaseKeywords: [String],
         },
         location: {
             latitude: Number,

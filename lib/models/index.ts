@@ -9,6 +9,7 @@ import RiskAlert from './RiskAlert';
 import ApprovalLog from './ApprovalLog';
 import Conversation from './Conversation';
 import Doctor from './Doctor';
+import Consultation from './Consultation';
 
 export {
   User,
@@ -22,4 +23,5 @@ export {
   ApprovalLog,
   Conversation,
   Doctor,
+  Consultation,
 };

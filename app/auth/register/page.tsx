@@ -173,7 +173,6 @@ export default function RegisterPage() {
         ['Needs', values.requiredNeeds],
       ]
     }
-
     return [
       ['Name', values.name],
       ['Email', values.email],
@@ -279,11 +278,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10 p-4">
+    <div className="min-h-screen bg-linear-to-br from-background via-background to-secondary/10 p-4">
       <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center py-10">
         <Card className="w-full overflow-hidden border-border/50 shadow-2xl">
           <div className="grid lg:grid-cols-[320px,1fr]">
-            <div className="bg-gradient-to-br from-primary to-secondary p-8 text-primary-foreground">
+            <div className="bg-linear-to-br from-primary to-secondary p-8 text-primary-foreground">
               <div className="mb-8 flex items-center gap-3">
                 <Heart className="h-10 w-10 fill-current" />
                 <div>
@@ -298,11 +297,14 @@ export default function RegisterPage() {
                   <h1 className="mt-2 text-3xl font-bold leading-tight">
                     {role === 'healthcenter' ? 'Register your health center' : 'Create your account'}
                   </h1>
+                  <p className="mt-3 text-sm text-primary-foreground/80">
+                    Doctors do not self-register here. Their login is created by the hospital or health center that adds them to the platform.
+                  </p>
                 </div>
 
                 <Progress value={progress} className="bg-white/20" />
 
-                <div className="space-y-3">
+                <div className="space-y-3 flex flex-row justify-between">
                   {steps.map((label, index) => (
                     <div
                       key={label}

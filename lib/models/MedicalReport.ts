@@ -43,6 +43,16 @@ const medicalReportSchema = new mongoose.Schema(
         // Metadata
         hospitalName: String,
         doctorName: String,
+        assignedDoctorId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Doctor',
+        },
+        doctorUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        doctorNotes: String,
+        doctorSummary: String,
         testDate: Date,
         reportDate: Date,
 

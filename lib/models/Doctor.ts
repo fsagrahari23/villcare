@@ -5,8 +5,12 @@ const doctorSchema = new mongoose.Schema(
         healthCenterId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'HealthCenter',
-            required: true,
             index: true,
+        },
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            sparse: true,
         },
         name: {
             type: String,

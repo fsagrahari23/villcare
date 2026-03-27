@@ -13,7 +13,7 @@ export default function PendingApprovalsPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [applications, setApplications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const storedUser = localStorage.getItem('user')
+  const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
   const user = storedUser ? JSON.parse(storedUser) : null
   const staffId = user?._id || "65f123456789012345678901"
 

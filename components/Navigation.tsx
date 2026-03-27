@@ -20,10 +20,11 @@ import {
 import { Button } from '@/components/ui/button'
 
 type AppRole = 'patient' | 'staff' | 'admin' | 'healthcenter'
+type ExtendedAppRole = AppRole | 'doctor'
 
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [userRole, setUserRole] = useState<AppRole>('patient')
+  const [userRole, setUserRole] = useState<ExtendedAppRole>('patient')
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user')
@@ -66,13 +67,24 @@ export default function Navigation() {
     { icon: <Stethoscope className="w-4 h-4" />, label: 'Meetings', href: '/healthcenter/dashboard#consultations' },
   ]
 
-  const links = userRole === 'healthcenter'
+  const doctorLinks = [
+    { icon: <LayoutDashboard className="w-4 h-4" />, label: 'Dashboard', href: '/doctor/dashboard' },
+    { icon: <FileText className="w-4 h-4" />, label: 'Patient Records', href: '/doctor/dashboard#records' },
+    { icon: <Stethoscope className="w-4 h-4" />, label: 'Consultations', href: '/doctor/dashboard#consultations' },
+    { icon: <User className="w-4 h-4" />, label: 'Profile', href: '/profile' },
+  ]
+
+  const links = userRole === 'doctor'
+    ? doctorLinks
+    : userRole === 'healthcenter'
     ? healthCenterLinks
     : userRole === 'staff' || userRole === 'admin'
       ? staffLinks
       : patientLinks
 
-  const homeHref = userRole === 'healthcenter'
+  const homeHref = userRole === 'doctor'
+    ? '/doctor/dashboard'
+    : userRole === 'healthcenter'
     ? '/healthcenter/dashboard'
     : userRole === 'staff' || userRole === 'admin'
       ? '/staff/dashboard'

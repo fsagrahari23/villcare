@@ -278,11 +278,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-background via-background to-secondary/10 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10 p-4">
       <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center py-10">
         <Card className="w-full overflow-hidden border-border/50 shadow-2xl">
           <div className="grid lg:grid-cols-[320px,1fr]">
-            <div className="bg-linear-to-br from-primary to-secondary p-8 text-primary-foreground">
+            <div className="bg-gradient-to-br from-primary to-secondary p-8 text-primary-foreground">
               <div className="mb-8 flex items-center gap-3">
                 <Heart className="h-10 w-10 fill-current" />
                 <div>
@@ -304,7 +304,7 @@ export default function RegisterPage() {
 
                 <Progress value={progress} className="bg-white/20" />
 
-                <div className="space-y-3 flex flex-row justify-between">
+                <div className="space-y-3">
                   {steps.map((label, index) => (
                     <div
                       key={label}

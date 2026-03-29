@@ -45,7 +45,6 @@ async function backfillGeoLocations() {
     })),
   );
 }
-
 async function findNearbyHealthCenters(params: {
   latitude?: number | null;
   longitude?: number | null;

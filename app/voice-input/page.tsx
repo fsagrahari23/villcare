@@ -962,7 +962,7 @@ export default function VoiceInputPage() {
                         <h3 className="text-lg font-bold text-secondary-foreground">Consultation Room Ready</h3>
                         <div className="mt-4 space-y-2 text-sm">
                           <p><strong>Room ID:</strong> {roomInfo.roomID}</p>
-                          <p><strong>Token:</strong> {roomInfo.token || 'Token not configured yet'}</p>
+                          {/* <p><strong>Token:</strong> {roomInfo.token || 'Token not configured yet'}</p> */}
                           <p>{roomInfo.message}</p>
                           {roomInfo.consultationId && (
                             <Button variant="outline" asChild>

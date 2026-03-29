@@ -277,13 +277,13 @@ export default function HealthCenterDashboardPage() {
                   <div className="mt-5 space-y-3 text-sm">
                     <p><strong>Doctor:</strong> {meetingInfo.doctorName}</p>
                     <p><strong>Room ID:</strong> {meetingInfo.roomID}</p>
-                    <p><strong>Token:</strong> {meetingInfo.token || 'Server token not configured'}</p>
-                    <div className="rounded-2xl bg-muted/40 p-4 font-mono text-xs leading-relaxed">
+                    {/* <p><strong>Token:</strong> {meetingInfo.token || 'Server token not configured'}</p> */}
+                    {/* <div className="rounded-2xl bg-muted/40 p-4 font-mono text-xs leading-relaxed">
                       const result = await zg.loginRoom(roomID, token, {'{'} userID, userName {'}'}){'\n'}
                       const stream = await zg.createStream(source){'\n'}
                       zg.startPublishingStream(streamID, stream){'\n'}
                       const remoteStream = await zg.startPlayingStream(streamID)
-                    </div>
+                    </div> */}
                     <p className="text-muted-foreground">{meetingInfo.message}</p>
                   </div>
                 ) : (
